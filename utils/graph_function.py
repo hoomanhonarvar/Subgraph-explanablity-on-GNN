@@ -85,18 +85,6 @@ def induced_subgraph(data, node_indices):
     return sub_data
 
 
-# def induced_subgraph(data, node_indices):
-    
-#     node_set = torch.tensor(node_indices, dtype=torch.long)
-#     edge_index, _ = subgraph(node_set, data.edge_index, relabel_nodes=True)
-#     x = data.x[node_set]
-#     sub_data = Data(x=x, edge_index=edge_index)
-#     if hasattr(data, 'y'):
-#         sub_data.y = data.y
-#     return sub_data
-
-
-
 def is_graph_connected(data):
     
     G = to_networkx(data, to_undirected=True)
@@ -187,7 +175,7 @@ def compute_node_saliency(model, data, target_class, device):
     return saliency.cpu()
 
 
-def ensure_connectivity(sub_data, original_data, target_size):
+def ensure_connectivity(sub_data, original_data):
     
     G_sub = to_networkx(sub_data, to_undirected=True)
     if ntx.is_connected(G_sub):
@@ -203,7 +191,7 @@ def ensure_connectivity(sub_data, original_data, target_size):
     return connected_data, final_nodes
 
 
-def ensure_connected_with_shortest_paths(original_data, selected_nodes, target_size):
+def ensure_connected_with_shortest_paths(original_data, selected_nodes):
     
     G_full = to_networkx(original_data, to_undirected=True)
     
