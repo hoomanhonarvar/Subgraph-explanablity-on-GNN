@@ -1,21 +1,28 @@
+# Python version (recommended)
+# Python 3.10.20
+
 # Core ML & Deep Learning
 torch>=2.0.0
 torchvision>=0.15.0
 torchaudio>=2.0.0
 
+# PyTorch Geometric & extensions
 torch-geometric>=2.3.0
 torch-scatter>=2.1.0
 torch-sparse>=0.6.17
 torch-cluster>=1.6.1
 
+# Data science & numerical
 numpy>=1.24.0
 scipy>=1.10.0
-pandas>=1.5.0  
+pandas>=1.5.0
 
+# Visualization & graph tools
 matplotlib>=3.7.0
 networkx>=3.0
 
+# Machine learning utilities
 scikit-learn>=1.3.0
 
+# Progress bar
 tqdm>=4.65.0
-
