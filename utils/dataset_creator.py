@@ -34,16 +34,20 @@ class BA2MotifWithGroundTruth(InMemoryDataset):
     @property
     def processed_file_names(self) -> List[str]:
         return 'data.pt'
+    
+    @property
+    def num_classes(self):
+        return 2
 
     def process(self):
         dataset1 = ExplainerDataset(
-            graph_generator=BAGraph(num_nodes=25, num_edges=1),
+            graph_generator=BAGraph(num_nodes=20, num_edges=1),
             motif_generator=HouseMotif(),
             num_motifs=1,
             num_graphs=500,
         )
         dataset2 = ExplainerDataset(
-            graph_generator=BAGraph(num_nodes=25, num_edges=1),
+            graph_generator=BAGraph(num_nodes=20, num_edges=1),
             motif_generator=CycleMotif(5),
             num_motifs=1,
             num_graphs=500,
@@ -59,18 +63,10 @@ class BA2MotifWithGroundTruth(InMemoryDataset):
             else:
                 x = exp.x
 
-            y_val = exp.y
-            if y_val.dim() == 0:
-                y_val = y_val.item()
-            elif y_val.numel() == 1:
-                y_val = y_val.item()
-            else:
-                y_val = y_val.argmax().item()
-
             data = Data(
                 x=x,
                 edge_index=exp.edge_index,
-                y=y_val,
+                y=0,
                 node_mask=exp.node_mask.bool(),
                 edge_mask=exp.edge_mask.bool(),
                 motif_nodes=torch.where(exp.node_mask)[0],
@@ -96,18 +92,10 @@ class BA2MotifWithGroundTruth(InMemoryDataset):
             else:
                 x = exp.x
 
-            y_val = exp.y
-            if y_val.dim() == 0:
-                y_val = y_val.item()
-            elif y_val.numel() == 1:
-                y_val = y_val.item()
-            else:
-                y_val = y_val.argmax().item()
-
             data = Data(
                 x=x,
                 edge_index=exp.edge_index,
-                y=y_val,
+                y=1,
                 node_mask=exp.node_mask.bool(),
                 edge_mask=exp.edge_mask.bool(),
                 motif_nodes=torch.where(exp.node_mask)[0],

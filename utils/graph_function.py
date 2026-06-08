@@ -242,7 +242,7 @@ def baseline_explanation(model, data, target_class, budget, device):
     sub_data_initial = induced_subgraph(data_cpu, selected_nodes)
     
     final_nodes, explanation_graph = ensure_connected_with_shortest_paths(
-        data_cpu, selected_nodes, k
+        data_cpu, selected_nodes
     )
     
     original_data_score=compute_score(model,data,target_class,device=device)
