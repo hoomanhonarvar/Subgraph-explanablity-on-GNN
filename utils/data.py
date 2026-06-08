@@ -8,7 +8,7 @@ from dataset_creator import BA2MotifWithGroundTruth
 
 def load_data(dataset_root="./../data/BA2Motif",dataset_with_gt_root="./../data/BA2Motif_GT", with_gt:bool=False):
     if with_gt:
-        return BA2MotifWithGroundTruth()
+        return BA2MotifWithGroundTruth(root=dataset_with_gt_root)
     return BA2MotifDataset(root=dataset_root)
 
 
@@ -100,4 +100,4 @@ def train_test_split(dataset,saving_root="./../data/splits.pkl",train_ratio=0.8,
 
 
 if __name__=="__main__":
-    train_test_split(load_data())
+    train_test_split(load_data(with_gt=True))
