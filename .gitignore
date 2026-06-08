@@ -222,3 +222,12 @@ __marimo__/
 # reports 
 report*
 Subgraph_explanablity_on_GNN_404131029.zip
+
+
+
+#explanation pictures
+explanation/
+
+
+#dataset
+data/*
