@@ -34,13 +34,11 @@ def remove_node(data, nodes_to_remove):
     return new_data
 
 
-
-def subgraph_connection_check(graph,node_set):
+def is_connected_subset(original_data, node_set):
     if len(node_set) <= 1:
         return True
-    sub_edge_index, _ = subgraph(node_set, graph.edge_index, relabel_nodes=True)
-    sub_data = Data(edge_index=sub_edge_index, num_nodes=len(node_set))
-    G = to_networkx(sub_data, to_undirected=True)
+    sub = induced_subgraph(original_data, list(node_set))
+    G = to_networkx(sub, to_undirected=True)
     return ntx.is_connected(G)
 
 
@@ -90,67 +88,61 @@ def is_graph_connected(data):
     G = to_networkx(data, to_undirected=True)
     return ntx.is_connected(G)
 
-
-def subgraph_explanation(model, data, target_class,device, budget=0.2, ):
-    
-    
-    initial_num_nodes = data.num_nodes
+def subgraph_explanation(model, original_data, target_class, device, budget=0.2, score_func='logit'):
+    # original_data هرگز تغییر نمی‌کند
+    initial_num_nodes = original_data.num_nodes
     target_size = budget if isinstance(budget, int) else int(initial_num_nodes * budget)
     target_size = max(1, min(target_size, initial_num_nodes))
-    
-    if not is_graph_connected(data):
-        G_full = to_networkx(data, to_undirected=True)
-        components = [list(comp) for comp in ntx.connected_components(G_full)]
+
+    # ---------- مرحله 1: اگر گراف ناهمبند ----------
+    if not is_graph_connected(original_data):
+        G = to_networkx(original_data, to_undirected=True)
+        components = [list(comp) for comp in ntx.connected_components(G)]  # لیست لیست ایندکس اصلی
         best_comp = None
         best_score = -float('inf')
         for comp in components:
-            sub = induced_subgraph(data, comp)
+            sub = induced_subgraph(original_data, comp)
             score = compute_score(model, sub, target_class, device)
             if score > best_score:
                 best_score = score
                 best_comp = comp
-        removed_nodes = list(set(range(data.num_nodes)) - set(best_comp))
-        data = induced_subgraph(data, best_comp)
-        current_nodes = set(range(data.num_nodes))
+        current_nodes = set(best_comp)           # ایندکس اصلی گره‌های برگزیده
+        removed_nodes = list(set(range(initial_num_nodes)) - current_nodes)
     else:
-        current_nodes = set(range(data.num_nodes))
+        current_nodes = set(range(initial_num_nodes))
         removed_nodes = []
-    
 
-
+    # ---------- مرحله 2: حذف حریصانه (با استفاده از original_data) ----------
     while len(current_nodes) > target_size:
+        # زیرگراف فعلی (بر اساس current_nodes)
+        current_subgraph = induced_subgraph(original_data, list(current_nodes))
         best_node = None
         best_delta = None
-        best_new_data = None
-        
+
         for v in list(current_nodes):
             candidate_nodes = current_nodes - {v}
-            if not subgraph_connection_check(data, list(candidate_nodes)):
+            # بررسی همبندی زیرگراف کاندید
+            if not is_connected_subset(original_data, candidate_nodes):
                 continue
-            
-            current_subgraph = remove_node(data, list(set(range(data.num_nodes)) - current_nodes))
-            candidate_subgraph = remove_node(data, list(set(range(data.num_nodes)) - candidate_nodes))
-            
+            candidate_subgraph = induced_subgraph(original_data, list(candidate_nodes))
             score_current = compute_score(model, current_subgraph, target_class, device)
             score_candidate = compute_score(model, candidate_subgraph, target_class, device)
-            
             delta = score_current - score_candidate
-            
             if best_delta is None or delta < best_delta:
                 best_delta = delta
                 best_node = v
-                best_new_data = candidate_subgraph
-        
+
         if best_node is None:
-            print("there is no node to remove! perhaps graph is not connected at all")
             break
-        
+
         current_nodes.remove(best_node)
         removed_nodes.append(best_node)
 
-    final_subgraph = remove_node(data, list(set(range(data.num_nodes)) - current_nodes))
-    fidelity_score = compute_score(model, data, target_class, device) - compute_score(model, final_subgraph, target_class, device)
-    
+    final_subgraph = induced_subgraph(original_data, list(current_nodes))
+    score_original = compute_score(model, original_data, target_class, device)
+    score_final = compute_score(model, final_subgraph, target_class, device)
+    fidelity_score = score_original - score_final
+
     return final_subgraph, removed_nodes, fidelity_score
 
 
