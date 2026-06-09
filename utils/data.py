@@ -73,7 +73,9 @@ def dataset_description(dataset,sample_index):
 
 
 
-def train_test_split(dataset,saving_root="./../data/splits.pkl",train_ratio=0.8,test_ratio=0.1):
+def train_test_split(dataset,saving_root="./data/splits.pkl",train_ratio=0.8,test_ratio=0.1,gt=False):
+    if gt:
+        saving_root="./data/splits_with_gt.pkl"
     total_len=len(dataset)
     train_len=int(train_ratio*total_len)
     test_len=int(test_ratio*total_len)
@@ -98,7 +100,7 @@ def train_test_split(dataset,saving_root="./../data/splits.pkl",train_ratio=0.8,
         'test':test_indices
     }
 
-    with open('./data/splits.pkl','wb') as f:
+    with open(saving_root,'wb') as f:
         pickle.dump(splits,f)
 
     print(f"train,test,validation indices saved in {saving_root}")
