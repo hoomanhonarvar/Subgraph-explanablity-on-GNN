@@ -24,7 +24,7 @@ class BA2MotifWithGroundTruth(InMemoryDataset):
         force_reload: bool = False,
     ):
         self.force_reload = force_reload
-        super().__init__(root, transform, pre_transform)
+        super().__init__(root, transform, pre_transform,force_reload=force_reload)
         self.data, self.slices = torch.load(self.processed_paths[0],weights_only=False)
 
     @property

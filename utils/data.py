@@ -12,6 +12,7 @@ def load_data(dataset_root="./../data/BA2Motif", dataset_with_gt_root="./../data
     dataset_with_gt_root = os.path.join(base_dir, dataset_with_gt_root) if not os.path.isabs(dataset_with_gt_root) else dataset_with_gt_root
     
     if with_gt:
+        
         return BA2MotifWithGroundTruth(root=dataset_with_gt_root)
     else:
         return BA2MotifDataset(root=dataset_root)
