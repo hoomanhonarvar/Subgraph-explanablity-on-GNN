@@ -87,4 +87,3 @@ def test_evaluation(model, loader, device):
             total += data.num_graphs
     return correct / total,correct_indices,wrong_indices
 
-

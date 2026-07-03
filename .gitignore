@@ -218,16 +218,12 @@ __marimo__/
 .streamlit/secrets.toml
 
 
-
-# reports 
+#reports
 report*
-Subgraph_explanablity_on_GNN_404131029.zip
+final*
+*.zip
 
+# pictures & dataset
 
-
-#explanation pictures
 explanation/
-
-
-#dataset
-data/*
+data/
