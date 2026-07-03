@@ -211,7 +211,39 @@ def subgraph_explanation(
 
     target_size = min(target_size, initial_num_nodes)
 
-    current_nodes = set(range(initial_num_nodes))
+
+
+    G = to_networkx(original_data, to_undirected=True)
+
+    if ntx.is_connected(G):
+        current_nodes = set(range(initial_num_nodes))
+
+    else:
+
+        components = list(ntx.connected_components(G))
+
+        best_score = -float("inf")
+        best_component = None
+
+        for comp in components:
+
+            comp = sorted(comp)
+
+            sub = induced_subgraph(original_data, comp)
+
+            score = compute_score(
+                model,
+                sub,
+                target_class,
+                device,
+                score_func,
+            )
+
+            if score > best_score:
+                best_score = score
+                best_component = comp
+
+        current_nodes = set(best_component)
 
     while len(current_nodes) > target_size:
 
@@ -290,62 +322,58 @@ def subgraph_explanation(
 
     fidelity = original_score - explanation_score
 
-    removed_nodes = sorted(
-        set(range(initial_num_nodes)) - set(final_nodes)
-    )
-
     return explanation, final_nodes, fidelity
 
-def ensure_connectivity(sub_data, original_data):
+# def ensure_connectivity(sub_data, original_data):
     
-    G_sub = to_networkx(sub_data, to_undirected=True)
-    if ntx.is_connected(G_sub):
-        return sub_data, list(G_sub.nodes)
+#     G_sub = to_networkx(sub_data, to_undirected=True)
+#     if ntx.is_connected(G_sub):
+#         return sub_data, list(G_sub.nodes)
     
-    components = list(ntx.connected_components(G_sub))
+#     components = list(ntx.connected_components(G_sub))
 
-    largest_comp = max(components, key=len)
-    current_nodes = set(largest_comp)
+#     largest_comp = max(components, key=len)
+#     current_nodes = set(largest_comp)
     
-    final_nodes = sorted(list(current_nodes))
-    connected_data = induced_subgraph(original_data, final_nodes)
-    return connected_data, final_nodes
+#     final_nodes = sorted(list(current_nodes))
+#     connected_data = induced_subgraph(original_data, final_nodes)
+#     return connected_data, final_nodes
 
 
-def ensure_connected_with_shortest_paths(original_data, selected_nodes):
+# def ensure_connected_with_shortest_paths(original_data, selected_nodes):
     
-    G_full = to_networkx(original_data, to_undirected=True)
+#     G_full = to_networkx(original_data, to_undirected=True)
     
-    sub_G = G_full.subgraph(selected_nodes).copy()
+#     sub_G = G_full.subgraph(selected_nodes).copy()
     
-    if ntx.is_connected(sub_G):
-        return selected_nodes, induced_subgraph(original_data, selected_nodes)
+#     if ntx.is_connected(sub_G):
+#         return selected_nodes, induced_subgraph(original_data, selected_nodes)
     
-    components = list(ntx.connected_components(sub_G))
-    components.sort(key=len, reverse=True)
+#     components = list(ntx.connected_components(sub_G))
+#     components.sort(key=len, reverse=True)
     
-    final_nodes = set(components[0])
+#     final_nodes = set(components[0])
     
-    for comp in components[1:]:
-        min_path = None
-        min_path_len = float('inf')
-        for u in comp:
-            for v in final_nodes:
-                try:
-                    path = ntx.shortest_path(G_full, source=u, target=v)
-                    if len(path) < min_path_len:
-                        min_path_len = len(path)
-                        min_path = path
-                except ntx.NetworkXNoPath:
-                    continue
-        if min_path is not None:
-            final_nodes.update(min_path) 
-        else:
-            final_nodes.update(comp)
+#     for comp in components[1:]:
+#         min_path = None
+#         min_path_len = float('inf')
+#         for u in comp:
+#             for v in final_nodes:
+#                 try:
+#                     path = ntx.shortest_path(G_full, source=u, target=v)
+#                     if len(path) < min_path_len:
+#                         min_path_len = len(path)
+#                         min_path = path
+#                 except ntx.NetworkXNoPath:
+#                     continue
+#         if min_path is not None:
+#             final_nodes.update(min_path) 
+#         else:
+#             final_nodes.update(comp)
     
-    final_nodes = sorted(list(final_nodes))
-    final_subgraph = induced_subgraph(original_data, final_nodes)
-    return final_nodes, final_subgraph
+#     final_nodes = sorted(list(final_nodes))
+#     final_subgraph = induced_subgraph(original_data, final_nodes)
+#     return final_nodes, final_subgraph
 
 
 
@@ -376,10 +404,6 @@ def baseline_explanation(
 
     selected_nodes = top_idx.tolist()
 
-    ##################################################################
-    # Connected component
-    ##################################################################
-
     G = to_networkx(data.cpu(), to_undirected=True)
 
     subgraph = G.subgraph(selected_nodes)
@@ -392,10 +416,6 @@ def baseline_explanation(
         )
 
         selected_nodes = list(largest_component)
-
-    ##################################################################
-    # Final explanation
-    ##################################################################
 
     explanation = induced_subgraph(
         data.cpu(),
