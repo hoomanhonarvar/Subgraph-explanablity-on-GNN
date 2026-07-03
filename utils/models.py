@@ -1,5 +1,5 @@
 import torch.nn as nn
-from torch_geometric.nn import GINConv,global_add_pool
+from torch_geometric.nn import GINConv,global_add_pool,global_mean_pool
 import torch
 
 
@@ -8,10 +8,9 @@ class GINGraphClf(nn.Module):
         super().__init__()
         self.conv1=GINConv(nn.Sequential(nn.Linear(in_dim, hidden_dim), nn.ReLU(),nn.BatchNorm1d(hidden_dim), nn.Linear(hidden_dim, hidden_dim),nn.ReLU()))
         self.conv2=GINConv(nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),nn.BatchNorm1d(hidden_dim), nn.Linear(hidden_dim, hidden_dim),nn.ReLU()))
-        self.conv3=GINConv(nn.Sequential(nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),nn.BatchNorm1d(hidden_dim), nn.Linear(hidden_dim, hidden_dim),nn.ReLU()))
         
         self.mlp = nn.Sequential(
-            nn.Linear(3*hidden_dim, hidden_dim//2),
+            nn.Linear(2*hidden_dim, hidden_dim//2),
             nn.Dropout(0.5),
             nn.ReLU(),
             nn.Linear(hidden_dim//2, out_dim),
@@ -21,14 +20,14 @@ class GINGraphClf(nn.Module):
     def forward(self, x, edge_index, batch):
         h1=self.conv1(x, edge_index)
         h2=self.conv2(h1, edge_index)
-        h3=self.conv3(h2, edge_index)
+        # h3=self.conv3(h2, edge_index)
 
-        h1=global_add_pool(h1,batch)
-        h2=global_add_pool(h2,batch)
-        h3=global_add_pool(h3,batch)    
+        h1=global_mean_pool(h1,batch)
+        h2=global_mean_pool(h2,batch)
+        # h3=global_add_pool(h3,batch)    
 
 
-        x=torch.cat([h1,h2,h3],dim=1)
+        x=torch.cat([h1,h2],dim=1)
 
 
         return self.mlp(x)
