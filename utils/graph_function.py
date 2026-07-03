@@ -3,6 +3,8 @@ from torch_geometric.data import Data
 import networkx as ntx
 from torch_geometric.utils import to_networkx,subgraph
 import matplotlib.pyplot as plt
+import torch
+import torch.nn.functional as F
 
 def remove_node(data, nodes_to_remove):
 
@@ -34,116 +36,137 @@ def remove_node(data, nodes_to_remove):
     return new_data
 
 
-def is_connected_subset(original_data, node_set):
+def is_connected_subset(original_graph, node_set):
+
     if len(node_set) <= 1:
         return True
-    sub = induced_subgraph(original_data, list(node_set))
-    G = to_networkx(sub, to_undirected=True)
-    return ntx.is_connected(G)
+
+    G = to_networkx(original_graph, to_undirected=True)
+
+    subgraph = G.subgraph(node_set)
+
+    return ntx.is_connected(subgraph)
 
 
-def compute_score(model,data,target_class,device):
+
+
+def compute_score(model, data, target_class, device, score_func="logit"):
     model.eval()
+    data = data.to(device)
     with torch.no_grad():
-        if data.batch is not None:
-            out=model(data.x,data.edge_index,data.batch)
-        else:
-            batch=torch.zeros(data.num_nodes,dtype=torch.long,device=device)
-            out = model(data.x, data.edge_index, batch)
+        batch = getattr(data, "batch", None)
+        if batch is None:
+            batch = torch.zeros(
+                data.num_nodes,
+                dtype=torch.long,
+                device=device,
+            )
+        out = model(data.x, data.edge_index, batch)
         if out.dim() == 1:
             out = out.unsqueeze(0)
-        score = out[0, target_class]  
-    return score 
-
+        if score_func == "prob":
+            out = F.softmax(out, dim=-1)
+        return out[0, target_class].item()
 
 
 def induced_subgraph(data, node_indices):
-    
-    if not isinstance(node_indices, torch.Tensor):
-        node_indices = torch.tensor(node_indices, dtype=torch.long)
-    
-    device = data.x.device
-    node_indices = node_indices.to(device)
-    
-    edge_index, _ = subgraph(node_indices, data.edge_index, relabel_nodes=True)
-    
-    x = data.x[node_indices]
-    
-    sub_data = Data(x=x, edge_index=edge_index)
-    
-    for key in data.keys():
-        if key in ['x', 'edge_index', 'num_nodes']:
-            continue
-        attr = data[key]
-        if torch.is_tensor(attr) and attr.size(0) == data.num_nodes:
-            sub_data[key] = attr[node_indices]
-        else:
-            sub_data[key] = attr
-    
-    return sub_data
 
+    if not isinstance(node_indices, torch.Tensor):
+        node_indices = torch.tensor(
+            node_indices,
+            dtype=torch.long,
+            device=data.x.device,
+        )
+
+    edge_index, _ = subgraph(
+        node_indices,
+        data.edge_index,
+        relabel_nodes=True,
+    )
+
+    new_data = Data(
+        x=data.x[node_indices],
+        edge_index=edge_index,
+    )
+
+    for key in data.keys():
+
+        if key in ["x", "edge_index", "num_nodes"]:
+            continue
+
+        value = data[key]
+
+        if (
+            torch.is_tensor(value)
+            and value.size(0) == data.num_nodes
+        ):
+            new_data[key] = value[node_indices]
+        else:
+            new_data[key] = value
+
+    return new_data
 
 def is_graph_connected(data):
     
     G = to_networkx(data, to_undirected=True)
     return ntx.is_connected(G)
 
-def subgraph_explanation(model, original_data, target_class, device, budget=0.2, score_func='logit'):
-    # original_data هرگز تغییر نمی‌کند
-    initial_num_nodes = original_data.num_nodes
-    target_size = budget if isinstance(budget, int) else int(initial_num_nodes * budget)
-    target_size = max(1, min(target_size, initial_num_nodes))
+# def subgraph_explanation(model, original_data, target_class, device, budget=0.2, score_func='logit'):
+#     # original_data هرگز تغییر نمی‌کند
+#     initial_num_nodes = original_data.num_nodes
+#     target_size = budget if isinstance(budget, int) else int(initial_num_nodes * budget)
+#     target_size = max(1, min(target_size, initial_num_nodes))
 
-    # ---------- مرحله 1: اگر گراف ناهمبند ----------
-    if not is_graph_connected(original_data):
-        G = to_networkx(original_data, to_undirected=True)
-        components = [list(comp) for comp in ntx.connected_components(G)]  # لیست لیست ایندکس اصلی
-        best_comp = None
-        best_score = -float('inf')
-        for comp in components:
-            sub = induced_subgraph(original_data, comp)
-            score = compute_score(model, sub, target_class, device)
-            if score > best_score:
-                best_score = score
-                best_comp = comp
-        current_nodes = set(best_comp)           # ایندکس اصلی گره‌های برگزیده
-        removed_nodes = list(set(range(initial_num_nodes)) - current_nodes)
-    else:
-        current_nodes = set(range(initial_num_nodes))
-        removed_nodes = []
+#     # ---------- مرحله 1: اگر گراف ناهمبند ----------
+#     if not is_graph_connected(original_data):
+#         G = to_networkx(original_data, to_undirected=True)
+#         components = [list(comp) for comp in ntx.connected_components(G)]  # لیست لیست ایندکس اصلی
+#         best_comp = None
+#         best_score = -float('inf')
+#         for comp in components:
+#             sub = induced_subgraph(original_data, comp)
+#             score = compute_score(model, sub, target_class, device)
+#             if score > best_score:
+#                 best_score = score
+#                 best_comp = comp
+#         current_nodes = set(best_comp)           # ایندکس اصلی گره‌های برگزیده
+#         removed_nodes = list(set(range(initial_num_nodes)) - current_nodes)
+#     else:
+#         current_nodes = set(range(initial_num_nodes))
+#         removed_nodes = []
 
-    # ---------- مرحله 2: حذف حریصانه (با استفاده از original_data) ----------
-    while len(current_nodes) > target_size:
-        # زیرگراف فعلی (بر اساس current_nodes)
-        current_subgraph = induced_subgraph(original_data, list(current_nodes))
-        best_node = None
-        best_delta = None
+#     # ---------- مرحله 2: حذف حریصانه (با استفاده از original_data) ----------
+#     while len(current_nodes) > target_size:
+#         # زیرگراف فعلی (بر اساس current_nodes)
+#         current_subgraph = induced_subgraph(original_data, list(current_nodes))
+#         best_node = None
+#         best_delta = None
 
-        for v in list(current_nodes):
-            candidate_nodes = current_nodes - {v}
-            # بررسی همبندی زیرگراف کاندید
-            if not is_connected_subset(original_data, candidate_nodes):
-                continue
-            candidate_subgraph = induced_subgraph(original_data, list(candidate_nodes))
-            score_current = compute_score(model, current_subgraph, target_class, device)
-            score_candidate = compute_score(model, candidate_subgraph, target_class, device)
-            delta = score_current - score_candidate
-            if best_delta is None or delta < best_delta:
-                best_delta = delta
-                best_node = v
+#         for v in list(current_nodes):
+#             candidate_nodes = current_nodes - {v}
+#             # بررسی همبندی زیرگراف کاندید
+#             if not is_connected_subset(original_data, candidate_nodes):
+#                 continue
+#             candidate_subgraph = induced_subgraph(original_data, list(candidate_nodes))
+#             score_current = compute_score(model, current_subgraph, target_class, device)
+#             score_candidate = compute_score(model, candidate_subgraph, target_class, device)
+#             delta = score_current - score_candidate
+#             if best_delta is None or delta < best_delta:
+#                 best_delta = delta
+#                 best_node = v
 
-        if best_node is None:
-            break
+#         if best_node is None:
+#             break
 
-        current_nodes.remove(best_node)
-        removed_nodes.append(best_node)
+#         current_nodes.remove(best_node)
+#         removed_nodes.append(best_node)
 
-    final_subgraph = induced_subgraph(original_data, list(current_nodes))
-    score_original = compute_score(model, original_data, target_class, device)
-    score_final = compute_score(model, final_subgraph, target_class, device)
-    fidelity_score = score_original - score_final
+#     final_subgraph = induced_subgraph(original_data, list(current_nodes))
+#     score_original = compute_score(model, original_data, target_class, device)
+#     score_final = compute_score(model, final_subgraph, target_class, device)
+#     fidelity_score = score_original - score_final
 
-    return final_subgraph, removed_nodes, fidelity_score
+#     return  removed_nodes, fidelity_score
 
 
 def compute_node_saliency(model, data, target_class, device):
@@ -166,6 +189,112 @@ def compute_node_saliency(model, data, target_class, device):
     
     return saliency.cpu()
 
+
+
+def subgraph_explanation(
+    model,
+    original_data,
+    target_class,
+    device,
+    budget=0.2,
+    score_func="logit",
+):
+
+    model.eval()
+
+    initial_num_nodes = original_data.num_nodes
+
+    if isinstance(budget, float):
+        target_size = max(1, int(initial_num_nodes * budget))
+    else:
+        target_size = budget
+
+    target_size = min(target_size, initial_num_nodes)
+
+    current_nodes = set(range(initial_num_nodes))
+
+    while len(current_nodes) > target_size:
+
+        current_subgraph = induced_subgraph(
+            original_data,
+            sorted(current_nodes),
+        )
+
+        current_score = compute_score(
+            model,
+            current_subgraph,
+            target_class,
+            device,
+            score_func,
+        )
+
+        best_node = None
+        smallest_delta = float("inf")
+
+        for node in list(current_nodes):
+
+            candidate_nodes = current_nodes - {node}
+
+            if not is_connected_subset(
+                original_data,
+                candidate_nodes,
+            ):
+                continue
+
+            candidate_subgraph = induced_subgraph(
+                original_data,
+                sorted(candidate_nodes),
+            )
+
+            candidate_score = compute_score(
+                model,
+                candidate_subgraph,
+                target_class,
+                device,
+                score_func,
+            )
+
+            delta = current_score - candidate_score
+
+            if delta < smallest_delta:
+                smallest_delta = delta
+                best_node = node
+
+        if best_node is None:
+            break
+
+        current_nodes.remove(best_node)
+
+    final_nodes = sorted(current_nodes)
+
+    explanation = induced_subgraph(
+        original_data,
+        final_nodes,
+    )
+
+    original_score = compute_score(
+        model,
+        original_data,
+        target_class,
+        device,
+        score_func,
+    )
+
+    explanation_score = compute_score(
+        model,
+        explanation,
+        target_class,
+        device,
+        score_func,
+    )
+
+    fidelity = original_score - explanation_score
+
+    removed_nodes = sorted(
+        set(range(initial_num_nodes)) - set(final_nodes)
+    )
+
+    return explanation, final_nodes, fidelity
 
 def ensure_connectivity(sub_data, original_data):
     
@@ -218,28 +347,77 @@ def ensure_connected_with_shortest_paths(original_data, selected_nodes):
     final_subgraph = induced_subgraph(original_data, final_nodes)
     return final_nodes, final_subgraph
 
-def baseline_explanation(model, data, target_class, budget, device):
 
-    saliency = compute_node_saliency(model, data, target_class, device)
+
+def baseline_explanation(
+    model,
+    data,
+    target_class,
+    budget,
+    device,
+    score_func="logit",
+):
+
+    saliency = compute_node_saliency(
+        model,
+        data,
+        target_class,
+        device,
+    )
+
     num_nodes = data.num_nodes
+
     if isinstance(budget, float):
         k = max(1, int(num_nodes * budget))
     else:
         k = min(budget, num_nodes)
-    
-    _, top_indices = torch.topk(saliency, k)
-    selected_nodes = top_indices.tolist()
-    
-    data_cpu = data.cpu()
-    sub_data_initial = induced_subgraph(data_cpu, selected_nodes)
-    
-    final_nodes, explanation_graph = ensure_connected_with_shortest_paths(
-        data_cpu, selected_nodes
-    )
-    
-    original_data_score=compute_score(model,data,target_class,device=device)
-    subgraph_score=compute_score(model,explanation_graph,target_class,device=device)
 
-    fidelity_score=original_data_score-subgraph_score
-    
-    return explanation_graph, final_nodes,round(fidelity_score.item(),4)
+    _, top_idx = torch.topk(saliency, k)
+
+    selected_nodes = top_idx.tolist()
+
+    ##################################################################
+    # Connected component
+    ##################################################################
+
+    G = to_networkx(data.cpu(), to_undirected=True)
+
+    subgraph = G.subgraph(selected_nodes)
+
+    if not ntx.is_connected(subgraph):
+
+        largest_component = max(
+            ntx.connected_components(subgraph),
+            key=len,
+        )
+
+        selected_nodes = list(largest_component)
+
+    ##################################################################
+    # Final explanation
+    ##################################################################
+
+    explanation = induced_subgraph(
+        data.cpu(),
+        selected_nodes,
+    )
+
+    original_score = compute_score(
+        model,
+        data,
+        target_class,
+        device,
+        score_func,
+    )
+
+    explanation_score = compute_score(
+        model,
+        explanation,
+        target_class,
+        device,
+        score_func,
+    )
+
+    fidelity = original_score - explanation_score
+
+    return explanation, selected_nodes, fidelity

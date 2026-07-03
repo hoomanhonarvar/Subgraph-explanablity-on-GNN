@@ -3,19 +3,13 @@ from torch_geometric.datasets import BA2MotifDataset
 from torch_geometric.loader import DataLoader
 from torch.utils.data import random_split
 import pickle
-from utils.dataset_creator import BA2MotifWithGroundTruth
 import os
 
-def load_data(dataset_root="./../data/BA2Motif", dataset_with_gt_root="./../data/BA2Motif_GT", with_gt: bool = False):
+def load_data(dataset_root="./../data/BA2Motif"):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset_root = os.path.join(base_dir, dataset_root) if not os.path.isabs(dataset_root) else dataset_root
-    dataset_with_gt_root = os.path.join(base_dir, dataset_with_gt_root) if not os.path.isabs(dataset_with_gt_root) else dataset_with_gt_root
-    
-    if with_gt:
-        
-        return BA2MotifWithGroundTruth(root=dataset_with_gt_root)
-    else:
-        return BA2MotifDataset(root=dataset_root)
+
+    return BA2MotifDataset(root=dataset_root)
 
 
 
