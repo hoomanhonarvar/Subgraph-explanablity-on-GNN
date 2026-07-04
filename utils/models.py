@@ -40,6 +40,7 @@ def train_one_epoch(model,loader,optimizer,criterion,device):
         data=data.to(device)
         optimizer.zero_grad()
         output=model(data.x,data.edge_index,data.batch)
+        
         loss=criterion(output,data.y)
         loss.backward()
         optimizer.step()
