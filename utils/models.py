@@ -20,11 +20,9 @@ class GINGraphClf(nn.Module):
     def forward(self, x, edge_index, batch):
         h1=self.conv1(x, edge_index)
         h2=self.conv2(h1, edge_index)
-        # h3=self.conv3(h2, edge_index)
 
         h1=global_mean_pool(h1,batch)
         h2=global_mean_pool(h2,batch)
-        # h3=global_add_pool(h3,batch)    
 
 
         x=torch.cat([h1,h2],dim=1)
